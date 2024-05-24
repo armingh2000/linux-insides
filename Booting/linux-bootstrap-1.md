@@ -32,11 +32,11 @@ The [80386](https://en.wikipedia.org/wiki/Intel_80386) and later CPUs define the
 
 ```
 IP (Instruction Pointer)       0xfff0
-CS (Code segment) selector     0xf000
-CS (Code segment) base         0xffff0000
+CS (Code Segment) selector     0xf000
+CS (Code Segment) base         0xffff0000
 ```
 
-The processor starts working in [real mode](https://en.wikipedia.org/wiki/Real_mode). Let's back up a little and try to understand [memory segmentation](https://en.wikipedia.org/wiki/Memory_segmentation) in this mode. Real mode is supported on all x86-compatible processors, from the [8086](https://en.wikipedia.org/wiki/Intel_8086) CPU all the way to the modern Intel 64-bit CPUs. The `8086` processor has a 20-bit address bus, which means that it could work with a `0-0xFFFFF` or `1 megabyte` address space. But it only has `16-bit` registers, which have a maximum address of `2^16 - 1` or `0xffff` (64 kilobytes).
+The processor starts working in [real mode](https://wiki.osdev.org/Real_mode). Let's back up a little and try to understand [memory segmentation](https://en.wikipedia.org/wiki/Memory_segmentation) in this mode. Real mode is supported on all x86-compatible processors, from the [8086](https://en.wikipedia.org/wiki/Intel_8086) CPU all the way to the modern Intel 64-bit CPUs. The `8086` processor has a 20-bit address bus, which means that it could work with a `0-0xFFFFF` or `1 megabyte` address space. But it only has `16-bit` registers, which have a maximum address of `2^16 - 1` or `0xffff` (64 kilobytes).
 
 [Memory segmentation](https://en.wikipedia.org/wiki/Memory_segmentation) is used to make use of all the address space available. All memory is divided into small, fixed-size segments of `65536` bytes (64 KB). Since we cannot address memory above `64 KB` with 16-bit registers, an alternate method was devised. In other words, when we calculate any address using registers and load it into the address bus, we can only cover 64 kilobytes and cannot fill the address bus.
 
@@ -64,7 +64,7 @@ which is `65520` bytes past the first megabyte. Since only one megabyte is acces
 
 Ok, now we know a little bit about real mode and its memory addressing. Let's get back to discussing register values after reset.
 
-The `CS` register consists of two parts: the visible segment selector and the hidden base address.  In real-address mode, the base address is normally formed by shifting the 16-bit segment selector value 4 bits to the left to produce a 20-bit base address. However, during a hardware reset the segment selector in the CS register is loaded with `0xf000` and the base address is loaded with `0xffff0000`. The processor uses this special base address until `CS` changes.
+The `CS` register consists of two parts: the visible segment selector and the hidden base address.  In real-address mode, the base address is normally formed by shifting the 16-bit segment selector value 4 bits to the left to produce a 20-bit base address. However, during a hardware reset the segment selector in the CS register is loaded with `0xf000` and the base address is loaded with `0xffff0000`. The processor uses this special base address until `CS selector` changes.
 
 The starting address is formed by adding the base address to the value in the EIP register:
 
@@ -80,12 +80,12 @@ We get `0xfffffff0`, which is 16 bytes below 4GB. This point is called the [rese
     .code16
 .globl	_start
 _start:
-    .byte  0xe9
-    .int   _start16bit - ( . + 2 )
+    .byte  0xe9                     ; emitting 1 byte code, i.e., 0xe9 (jmp instruction opcode). "." is the address of _start at this line.
+    .int   _start16bit - ( . + 2 )  ; emitting 2 bytes (16 bits) offset for the jmp instruction. "." is the address of the previous line at this line.
     ...
 ```
 
-Here we can see the `jmp` instruction [opcode](http://ref.x86asm.net/coder32.html#xE9), which is `0xe9`, and its destination address at `_start16bit - ( . + 2)`.
+Here we can see the `jmp` instruction [opcode](http://ref.x86asm.net/coder32.html#xE9), which is `0xe9`, and its destination address at `_start16bit - ( . + 2)`. `+ 2` is for adjusting the offset to correctly land on the `_start16bit` address. If there is no `+ 2`, when the `jmp` offset is evaluating, it will point to `_start16bit` correctly using the current `.` position. But when the evaluation is done and it is time to execute the `jmp` instruction, the instruction pointer `.` is moved 2 bytes (16 bits) ahead due to the offset calculation in the previous step. This will result in jumping to 2 bytes after the `_start16bit` address. 
 
 We also see that the `reset` section is `16` bytes and is compiled to start from the address `0xfffffff0` ([src/cpu/x86/16bit/reset16.ld](https://review.coreboot.org/plugins/gitiles/coreboot/+/refs/heads/4.11_branch/src/cpu/x86/16bit/reset16.ld)):
 
